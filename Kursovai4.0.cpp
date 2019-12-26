@@ -297,7 +297,7 @@ void define(int str, int stol)
 			funFlag = 1;
 		}
 
-		if (flag == 2 && a[str][stol] != "\n") {
+		if ((flag == 2 || flag ==3) && a[str][stol] != "\n") {
 			int y = 0;
 			int i = 0;
 			for (y = 0; y < pos_fun; y++)
@@ -320,10 +320,10 @@ void define(int str, int stol)
 			continue;
 		}
 		if (a[str][stol][0] == ')' && flag == 1) flag = 2; //stol++; while (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ')stol++; }
-		if (flag == 1 || flag == 3) per_fun[pos_fun++] = a[str][stol];
+		if (flag == 1) per_fun[pos_fun++] = a[str][stol];
 		a[str][0][0] = '.';
 	}
-	per_fun = (char**)realloc(per_fun, (pos_fun) * sizeof(char*));
+	per_fun = (char**)realloc(per_fun, (pos_fun + 1) * sizeof(char*));
 	arr_for = (char*)realloc(arr_for, (pos_for + 1) * sizeof(char));
 	per_pos = (int*)realloc(per_pos, pos * sizeof(int));
 	printf("(%s) ", nam_fun);
@@ -331,8 +331,9 @@ void define(int str, int stol)
 	for (int i = 0; i < pos_fun; i++)
 		printf("(%s) ", per_fun[i]);
 	printf("\n");
-	if (flag == 2) rem_lot(str + 1, arr_for, nam_fun, per_pos);
-	if (flag == 3) rem_few(str + 1, nam_fun,  pos_fun , per_fun);
+	//if (flag == 2 || flag == 3) 
+		rem_lot(str + 1, arr_for, nam_fun, per_pos);
+	//if (flag == 3) rem_few(str + 1, nam_fun,  pos_fun , per_fun);
 
 	free(buffer);
 	free(nam_fun);
@@ -364,7 +365,6 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 		for (int stol = 0; stol < len_str[str]; stol++)
 		{
 			COM
-
 			if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
 
 			if (!(strcmp(a[str][stol], "ifdef")) || !(strcmp(a[str][stol], "ifndef")) || !(strcmp(a[str][stol], "undef")))
@@ -383,6 +383,7 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 			if (!(strcmp(a[str][stol], nam_fun)) && flag == -1) {
 				flag = 0;
 				str_stol = stol;
+				stol++;
 			}
 
 			if (flag == 1) {
@@ -398,12 +399,12 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 				per_fun[pos_fun++][i] = '\0';
 			}
 
-			if (a[str][stol][0] == '(' && flag == 0) flag = 1;
+			if (flag == 0) flag = 1;
 
 			if (flag == 2)
 			{
-				for (int i = 0; i < pos_fun; i++)
-					printf("(%s) ", per_fun[i]);
+				//for (int i = 0; i < pos_fun; i++)
+					//printf("(%s) ", per_fun[i]);
 				int i = 0;
 				int k = 0;
 				per_fun = (char**)realloc(per_fun, (pos_fun) * sizeof(char*));
