@@ -27,8 +27,8 @@ coment = 2 - строковая константа //
 2) В условных конструкциях препроцессора считаются только 2 слагаемых, если их больше, результат воспринимается как "false".
 3) В условных конструкциях препроцессора не считаются унарные операции, инкремент и дикремент.
 4) В условных конструкциях препроцессора определены ТОЛЬКО операции сложения, вычитания, умножения, деления, модуля и XOR. 
-5) При считывании макроопределения не учитывается его перенос на следующую строку.
-6) Отсутствует определение #if defined (аналога #ifdef) 
+5) Отсутствует определение #if defined (аналога #ifdef) 
+6) Отсутствует определение склеивания лексем ##
 */
 /*
 Решения:
@@ -36,14 +36,16 @@ coment = 2 - строковая константа //
 2) Учтены все виды коментариев и констант
 3) Реализованны условия #ifdef, #ifndef, #if, #elif, #else, #endif, а также #undef(с ограничениями)
 4) Выполнено условие неограниченной вложенности условной трансляции
+5) При считывании макроопределения учитывается его перенос на следующую строку.
 */
 
 void HUSH(int flag, int i);
 void define(int str, int stol);
-void rem_lot(int str, char* arr_for, char* nam_fun);
+void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos);
 void rem_few(int str, char* nam_fun, int pos_fun, char** per_fun);
 int if_(int str, int stol);
 int ifdef (int str, int stol, int one);
+void include(int str, int stol);
 
 char*** a = NULL;
 int* len_str = NULL;
@@ -142,7 +144,7 @@ int main(int argc, char* argv[]) {
 }
 
 void HUSH(int flag, int i) {
-	const char* func[] = { "define", "if", "ifdef", "ifndef", "elif", "else", "endif", "undef" }; // константы #
+	const char* func[] = { "define", "if", "ifdef", "ifndef", "elif", "else", "endif","include" }; // константы #
 
 	bool into = 0; //определение просмотра вложенной директивы (0 - смотри, 1 - пропуск)
 	int def = 0; // определитель вложенности
@@ -170,7 +172,7 @@ void HUSH(int flag, int i) {
 									  else  into = 1;
 									def = 1;
 									break;
-								case 0: define(str, ++stol); break;
+								case 0: if (flag == 0) define(str, ++stol); break;
 								case 2: if (flag == 0) flag = ifdef(str, stol, 0);
 									  else  into = 1;
 									def = 1;
@@ -186,9 +188,10 @@ void HUSH(int flag, int i) {
 									  else if (flag == 0) flag = -1;
 									break; //else
 								case 6: flag = 0;  break; //endif(a)
+								case 7: include(str, ++stol); break; //include
 								default:  break;
 								}
-								a[str][0][0] = '.';
+								if(strcmp(a[str][stol-1], func[7]))a[str][0][0] = '.';
 								break;
 							}
 						}
@@ -215,11 +218,51 @@ void HUSH(int flag, int i) {
 	}
 }
 
+void include(int str, int stol) {
+	char* nam_fun = (char*)calloc(32, sizeof(char)); // имя функции
+
+	int flag = 0;
+	int undef = 0;
+	int coment = 0;
+	for (str; str < qu_str; str++)
+	{
+		undef = 0;
+		for (stol; stol < len_str[str]; stol++)
+		{
+			if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
+
+			if (flag == 0)
+			{
+				if (a[str][stol][0] == '"' || a[str][stol][0] == '<') stol++;
+				nam_fun = a[str][stol];
+				flag = 1;
+			}
+
+			COM
+
+				if (!(strcmp(a[str][stol], "ifdef")) || !(strcmp(a[str][stol], "ifndef")) || !(strcmp(a[str][stol], "undef")))
+				{
+					if (!(strcmp(a[str][stol++], "undef"))) undef = 1;
+					for (stol; stol < len_str[str]; stol++)
+					{
+						if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
+						if (undef == 0 && !(strcmp(a[str][stol], nam_fun))) a[str][stol][0] = '.';
+						else if (undef == 1 && !(strcmp(a[str][stol], nam_fun))) undef = 2;
+						break;
+					}
+				}
+		}
+		if (undef == 2) break;
+		stol = 0;
+	}
+
+}
 
 void define(int str, int stol)
 {
 	char* arr_for = (char*)calloc(N, sizeof(char)); // массив с формулой макроопределения
 	char** per_fun = (char**)calloc(N, sizeof(char*)); //переменные функции
+	int* per_pos = (int*)calloc(M, sizeof(int)); // массив с позициями переменных замены
 	char* nam_fun = (char*)calloc(32, sizeof(char)); // имя функции
 	char* buffer = (char*)malloc(32); // слово читается до 32 символов
 
@@ -228,6 +271,7 @@ void define(int str, int stol)
 	int funFlag = 0; //начальный определитель функционального макроопределения
 	int flag = -1;
 	int coment = 0;
+	int pos = 0; //per_pos[pos]
 
 	/*
 	flag = -1 начало
@@ -239,21 +283,15 @@ void define(int str, int stol)
 
 	for (stol; stol < len_str[str]; stol++)
 	{
+		//printf("(%s) ", a[str][stol]);
 		COM
-			if (a[str][stol][0] == '\\' && a[str][stol + 1][0] == '\n') { // Считывание переносов макроопределения
-				per_fun[pos_fun++] = a[str][stol + 1];
-				stol = 0;
-				str++;
-				per_fun[pos_fun] = (char*)calloc(M, 1);
-				strcpy(per_fun[pos_fun++], a[str][stol]);
-				a[str][stol][0] = '.';
-				continue;
-		}
-
+			if (a[str][stol][0] == '\\' && a[str][stol+1][0] == '\n')
+			{
+				str++; stol = 0;
+			}
 		funFlag = 0;
 
-		if (flag != 3 && flag!=2 && (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ') ) continue;
-		//if (flag != 3 && a[str][stol][0] == ',') continue;
+		if (flag != 3 && flag==2 && (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ') ) continue;
 		if (flag == -1) {
 			nam_fun = a[str][stol++];
 			flag = 0;
@@ -266,6 +304,7 @@ void define(int str, int stol)
 			for (y = 0; y < pos_fun; y++)
 				if (!strcmp(a[str][stol], per_fun[y]))
 				{
+					per_pos[pos++] = pos_for;
 					char* buffer = (char*)malloc(32);
 					arr_for[pos_for++] = *itoa(y, buffer, 10) + 1;
 					free(buffer);
@@ -275,7 +314,7 @@ void define(int str, int stol)
 		}
 
 		if (a[str][stol][0] == '(' && flag == 0 && funFlag == 1) {
-			flag = 1; stol++;
+			flag = 1; stol++; 
 		}
 		else if (flag == 0) {
 			flag = 3;
@@ -283,11 +322,14 @@ void define(int str, int stol)
 		}
 		if (a[str][stol][0] == ')' && flag == 1) flag = 2;
 		if (flag == 1 || flag == 3) per_fun[pos_fun++] = a[str][stol];
+		a[str][0][0] = '.';
 	}
 	per_fun = (char**)realloc(per_fun, (pos_fun) * sizeof(char*));
-	arr_for = (char*)realloc(arr_for, (pos_for) * sizeof(char));
-
-	if (flag == 2) rem_lot(str + 1, arr_for, nam_fun);
+	arr_for = (char*)realloc(arr_for, (pos_for + 1) * sizeof(char));
+	per_pos = (int*)realloc(per_pos, pos * sizeof(int));
+	//printf("   ");
+	printf("%s ", arr_for);
+	if (flag == 2) rem_lot(str + 1, arr_for, nam_fun, per_pos);
 	if (flag == 3) rem_few(str + 1, nam_fun,  pos_fun , per_fun);
 
 	free(buffer);
@@ -296,7 +338,7 @@ void define(int str, int stol)
 	free(arr_for);
 }
 
-void rem_lot(int str, char* arr_for, char* nam_fun) {
+void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 	char** per_fun = (char**)calloc(M, sizeof(char*)); //имена переменных функции
 	char** sav_ost = (char**)calloc(M, sizeof(char*)); // сохранение символов после функции
 	int str_stol = 0; // позиция перед заменой макроопределения
@@ -324,7 +366,7 @@ void rem_lot(int str, char* arr_for, char* nam_fun) {
 
 			if (!(strcmp(a[str][stol], "ifdef")) || !(strcmp(a[str][stol], "ifndef")) || !(strcmp(a[str][stol], "undef")))
 			{
-				if (!(strcmp(a[str][stol++], "undef"))) undef = 1; 
+				if (!(strcmp(a[str][stol++], "undef"))) undef = 1;
 				for (stol; stol < len_str[str]; stol++)
 				{
 					if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
@@ -340,11 +382,17 @@ void rem_lot(int str, char* arr_for, char* nam_fun) {
 				str_stol = stol;
 			}
 
-			if (a[str][stol][0] == ')' && flag == 1) flag = 2;
-
 			if (flag == 1) {
-				per_fun[pos_fun] = (char*)calloc(_msize(a[str][stol]) + 1, 1);
-				strcpy(per_fun[pos_fun++], a[str][stol]);
+				int i = 0, y = 0;
+				per_fun[pos_fun] = (char*)calloc(M, 1);
+				while (a[str][stol][y] != ',') {
+					if (a[str][stol][y] == ')') {
+						flag = 2; break;
+					}
+					per_fun[pos_fun][i++] = a[str][stol][y++];
+					if (a[str][stol][y] == '\0') {stol++; y=0;}
+				}
+				per_fun[pos_fun++][i] = '\0';
 			}
 
 			if (a[str][stol][0] == '(' && flag == 0) flag = 1;
@@ -352,6 +400,7 @@ void rem_lot(int str, char* arr_for, char* nam_fun) {
 			if (flag == 2)
 			{
 				int i = 0;
+				int k = 0;
 				per_fun = (char**)realloc(per_fun, (pos_fun) * sizeof(char*));
 				stol++;
 				for (stol; stol < len_str[str]; stol++, i++) // запись символов после замены
@@ -367,14 +416,22 @@ void rem_lot(int str, char* arr_for, char* nam_fun) {
 				for (int array = 0; array < _msize(arr_for); array++, stol++) // замена на макроопределение
 				{
 					a[str][stol] = (char*)calloc(M, sizeof(char));
-					if (arr_for[array] >= '0' && arr_for[array] <= '9')// замена слов
+					if (arr_for[array] >= '0' && arr_for[array] <= '9'&& per_pos[k] == array)// замена слов
 					{
 						strcpy(a[str][stol], per_fun[arr_for[array] - '0' - 1]);
 						a[str][stol] = (char*)realloc(a[str][stol], strlen(per_fun[arr_for[array] - '0' - 1 ]) + 1); //имена переменных функции
+						k++;
 					}
 					else // замена символов
 					{
-						a[str][stol][0] = arr_for[array]; a[str][stol][1] = '\0'; a[str][stol] = (char*)realloc(a[str][stol], 2); 
+						int y = 0;
+						if(tolower(arr_for[array]) >= 'a' && tolower(arr_for[array]) <= 'z' || arr_for[array] == '_')
+							do
+							a[str][stol][y++] = arr_for[array++];
+							while (tolower(arr_for[array]) >= 'a' && tolower(arr_for[array]) <= 'z' || arr_for[array] == '_');
+						else a[str][stol][y++] = arr_for[array++];
+						--array;
+						a[str][stol] = (char*)realloc(a[str][stol], y+1);
 					}
 				}
 				
@@ -398,6 +455,11 @@ void rem_lot(int str, char* arr_for, char* nam_fun) {
 			}
 		}
 		if (undef == 2) break;
+	}
+	for (int i = 0; i < N; i++)
+	{
+		free(per_fun);
+		free(sav_ost);
 	}
 }
 void rem_few(int str, char* nam_fun, int pos_fun, char** per_fun) {
@@ -553,7 +615,6 @@ int ifdef(int str, int stol, int one) {
 			flag = 0;
 		}
 	}
-
 		if(one ==  0)return (flag);
 		else return (flag - 122);
 }
