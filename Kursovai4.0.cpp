@@ -399,7 +399,10 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 				per_fun[pos_fun++][i] = '\0';
 			}
 
-			if (flag == 0) flag = 1;
+			if (a[str][stol][0] == '(' && flag == 0) flag = 1; 
+			else if (flag == 0) {
+				flag = 2;  stol--;
+			}
 
 			if (flag == 2)
 			{
