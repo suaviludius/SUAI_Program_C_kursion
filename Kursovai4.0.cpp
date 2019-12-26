@@ -283,7 +283,6 @@ void define(int str, int stol)
 
 	for (stol; stol < len_str[str]; stol++)
 	{
-		//printf("(%s) ", a[str][stol]);
 		COM
 			if (a[str][stol][0] == '\\' && a[str][stol+1][0] == '\n')
 			{
@@ -291,7 +290,7 @@ void define(int str, int stol)
 			}
 		funFlag = 0;
 
-		if (flag != 3 && flag==2 && (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ') ) continue;
+		if (flag != 3 && flag != 2 && (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ') ) continue;
 		if (flag == -1) {
 			nam_fun = a[str][stol++];
 			flag = 0;
@@ -320,15 +319,18 @@ void define(int str, int stol)
 			flag = 3;
 			continue;
 		}
-		if (a[str][stol][0] == ')' && flag == 1) flag = 2;
+		if (a[str][stol][0] == ')' && flag == 1) flag = 2; //stol++; while (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ')stol++; }
 		if (flag == 1 || flag == 3) per_fun[pos_fun++] = a[str][stol];
 		a[str][0][0] = '.';
 	}
 	per_fun = (char**)realloc(per_fun, (pos_fun) * sizeof(char*));
 	arr_for = (char*)realloc(arr_for, (pos_for + 1) * sizeof(char));
 	per_pos = (int*)realloc(per_pos, pos * sizeof(int));
-	//printf("   ");
-	printf("%s ", arr_for);
+	printf("(%s) ", nam_fun);
+	printf("(%s) ", arr_for);
+	for (int i = 0; i < pos_fun; i++)
+		printf("(%s) ", per_fun[i]);
+	printf("\n");
 	if (flag == 2) rem_lot(str + 1, arr_for, nam_fun, per_pos);
 	if (flag == 3) rem_few(str + 1, nam_fun,  pos_fun , per_fun);
 
@@ -336,6 +338,7 @@ void define(int str, int stol)
 	free(nam_fun);
 	free(per_fun);
 	free(arr_for);
+	free(per_pos);
 }
 
 void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
@@ -399,6 +402,8 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 
 			if (flag == 2)
 			{
+				for (int i = 0; i < pos_fun; i++)
+					printf("(%s) ", per_fun[i]);
 				int i = 0;
 				int k = 0;
 				per_fun = (char**)realloc(per_fun, (pos_fun) * sizeof(char*));
@@ -411,7 +416,6 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 				}
 				sav_ost = (char**)realloc(sav_ost, i * sizeof(char*));
 				stol = str_stol;
-
 				a[str] = (char**)realloc(a[str], N * sizeof(char*));
 				for (int array = 0; array < _msize(arr_for); array++, stol++) // замена на макроопределение
 				{
@@ -431,7 +435,7 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 							while (tolower(arr_for[array]) >= 'a' && tolower(arr_for[array]) <= 'z' || arr_for[array] == '_');
 						else a[str][stol][y++] = arr_for[array++];
 						--array;
-						a[str][stol] = (char*)realloc(a[str][stol], y+1);
+					    a[str][stol] = (char*)realloc(a[str][stol], y+1);
 					}
 				}
 				
@@ -455,11 +459,6 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 			}
 		}
 		if (undef == 2) break;
-	}
-	for (int i = 0; i < N; i++)
-	{
-		free(per_fun);
-		free(sav_ost);
 	}
 }
 void rem_few(int str, char* nam_fun, int pos_fun, char** per_fun) {
