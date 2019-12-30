@@ -5,6 +5,8 @@
 #include <windows.h>
 #define N 1000
 #define M 100
+#define PROPUSK (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',')
+
 #define COM		if (a[str][stol][0] == '"' && a[str][stol - 1][0] != '\\' && coment != 1)\
 				if(coment == 2) coment = 0;\
 				else coment = 2;\
@@ -37,12 +39,13 @@ coment = 2 - строковая константа //
 3) Реализованны условия #ifdef, #ifndef, #if, #elif, #else, #endif, а также #undef(с ограничениями)
 4) Выполнено условие неограниченной вложенности условной трансляции
 5) При считывании макроопределения учитывается его перенос на следующую строку.
+6) Учтены вложения однго функционального определения в другое (НО только для использования при повторении в одной строке)
+7) 
 */
 
 void HUSH(int flag, int i);
 void define(int str, int stol);
-void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos);
-void rem_few(int str, char* nam_fun, int pos_fun, char** per_fun);
+void rem_def(int str, char* arr_for, char* nam_fun, int* per_pos);
 int if_(int str, int stol);
 int ifdef (int str, int stol, int one);
 void include(int str, int stol);
@@ -229,7 +232,7 @@ void include(int str, int stol) {
 		undef = 0;
 		for (stol; stol < len_str[str]; stol++)
 		{
-			if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
+			if PROPUSK continue;
 
 			if (flag == 0)
 			{
@@ -290,7 +293,7 @@ void define(int str, int stol)
 			}
 		funFlag = 0;
 
-		if (flag != 3 && flag != 2 && (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ') ) continue;
+		if (flag != 3 && flag != 2 && PROPUSK) continue;
 		if (flag == -1) {
 			nam_fun = a[str][stol++];
 			flag = 0;
@@ -319,22 +322,20 @@ void define(int str, int stol)
 			flag = 3;
 			continue;
 		}
-		if (a[str][stol][0] == ')' && flag == 1) flag = 2; //stol++; while (a[str][stol][0] == ',' || a[str][stol][0] == '\t' || a[str][stol][0] == ' ')stol++; }
+		if (a[str][stol][0] == ')' && flag == 1) { flag = 2; while(a[str][stol+1][0] == '\t' || a[str][stol+1][0] == ' ' || a[str][stol+1][0] == ',') stol++; }
 		if (flag == 1) per_fun[pos_fun++] = a[str][stol];
 		a[str][0][0] = '.';
 	}
 	per_fun = (char**)realloc(per_fun, (pos_fun + 1) * sizeof(char*));
 	arr_for = (char*)realloc(arr_for, (pos_for + 1) * sizeof(char));
-	per_pos = (int*)realloc(per_pos, pos * sizeof(int));
-	printf("(%s) ", nam_fun);
+	per_pos = (int*)realloc(per_pos, pos * sizeof(int) + 1);
+	/*printf("(%s) ", nam_fun);
 	printf("(%s) ", arr_for);
 	for (int i = 0; i < pos_fun; i++)
 		printf("(%s) ", per_fun[i]);
 	printf("\n");
-	//if (flag == 2 || flag == 3) 
-		rem_lot(str + 1, arr_for, nam_fun, per_pos);
-	//if (flag == 3) rem_few(str + 1, nam_fun,  pos_fun , per_fun);
-
+	*/
+	rem_def(str + 1, arr_for, nam_fun, per_pos);
 	free(buffer);
 	free(nam_fun);
 	free(per_fun);
@@ -342,7 +343,7 @@ void define(int str, int stol)
 	free(per_pos);
 }
 
-void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
+void rem_def(int str, char* arr_for, char* nam_fun, int* per_pos) {
 	char** per_fun = (char**)calloc(M, sizeof(char*)); //имена переменных функции
 	char** sav_ost = (char**)calloc(M, sizeof(char*)); // сохранение символов после функции
 	int str_stol = 0; // позиция перед заменой макроопределения
@@ -352,6 +353,7 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 	int flag = -1;
 	int undef = 0; // определитель #undef с именем макроопределения (1 - true, 0 - false)
 	int coment = 0;
+	int scob = 0;
 
 	/*
 	flag = -1 начало
@@ -365,14 +367,14 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 		for (int stol = 0; stol < len_str[str]; stol++)
 		{
 			COM
-			if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
+			if PROPUSK continue;
 
 			if (!(strcmp(a[str][stol], "ifdef")) || !(strcmp(a[str][stol], "ifndef")) || !(strcmp(a[str][stol], "undef")))
 			{
 				if (!(strcmp(a[str][stol++], "undef"))) undef = 1;
 				for (stol; stol < len_str[str]; stol++)
 				{
-					if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
+					if PROPUSK continue;
 					if (undef == 0 && !(strcmp(a[str][stol], nam_fun))) a[str][stol][0] = '.';
 					else if (undef == 1 && !(strcmp(a[str][stol], nam_fun))) undef = 2;
 					break;
@@ -390,9 +392,11 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 				int i = 0, y = 0;
 				per_fun[pos_fun] = (char*)calloc(M, 1);
 				while (a[str][stol][y] != ',') {
-					if (a[str][stol][y] == ')') {
+					if (a[str][stol][y] == '(')scob++;
+					if (a[str][stol][y] == ')'&& scob == 0) {
 						flag = 2; break;
 					}
+					if (a[str][stol][y] == ')')scob--;
 					per_fun[pos_fun][i++] = a[str][stol][y++];
 					if (a[str][stol][y] == '\0') {stol++; y=0;}
 				}
@@ -401,7 +405,7 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 
 			if (a[str][stol][0] == '(' && flag == 0) flag = 1; 
 			else if (flag == 0) {
-				flag = 2;  stol--;
+				flag = 2;  stol--; pos_fun++;
 			}
 
 			if (flag == 2)
@@ -426,17 +430,17 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 					a[str][stol] = (char*)calloc(M, sizeof(char));
 					if (arr_for[array] >= '0' && arr_for[array] <= '9'&& per_pos[k] == array)// замена слов
 					{
-						strcpy(a[str][stol], per_fun[arr_for[array] - '0' - 1]);
-						a[str][stol] = (char*)realloc(a[str][stol], strlen(per_fun[arr_for[array] - '0' - 1 ]) + 1); //имена переменных функции
+						strcpy(a[str][stol], per_fun[arr_for[array] - '0' - 1]);//имена переменных функции
+						a[str][stol] = (char*)realloc(a[str][stol], strlen(per_fun[arr_for[array] - '0' - 1 ]) + 1); 
 						k++;
 					}
-					else // замена символов
+					else // замена остального
 					{
 						int y = 0;
-						if(tolower(arr_for[array]) >= 'a' && tolower(arr_for[array]) <= 'z' || arr_for[array] == '_')
+						if(tolower(arr_for[array]) >= 'a' && tolower(arr_for[array]) <= 'z' || arr_for[array] == '_'|| arr_for[array] >= '0' && arr_for[array] <= '9')
 							do
 							a[str][stol][y++] = arr_for[array++];
-							while (tolower(arr_for[array]) >= 'a' && tolower(arr_for[array]) <= 'z' || arr_for[array] == '_');
+							while (tolower(arr_for[array]) >= 'a' && tolower(arr_for[array]) <= 'z' || arr_for[array] == '_' || arr_for[array] >= '0' && arr_for[array] <= '9');
 						else a[str][stol][y++] = arr_for[array++];
 						--array;
 					    a[str][stol] = (char*)realloc(a[str][stol], y+1);
@@ -465,76 +469,6 @@ void rem_lot(int str, char* arr_for, char* nam_fun, int* per_pos) {
 		if (undef == 2) break;
 	}
 }
-void rem_few(int str, char* nam_fun, int pos_fun, char** per_fun) {
-	
-	char** sav_ost = (char**)calloc(M, sizeof(char*)); // сохранение символов после функции
-
-	int undef = 0;
-	int str_stol = 0;
-	int coment = 0;
-
-	for (str; str < qu_str; str++)
-	{
-		for (int stol = 0; stol < len_str[str]; stol++)
-		{
-			COM
-			str_stol = stol;
-			undef = 0;
-			if (!(strcmp(a[str][stol], "ifdef"))|| !(strcmp(a[str][stol], "ifndef"))|| !(strcmp(a[str][stol], "undef"))) //
-			{
-				if (!(strcmp(a[str][stol++], "undef"))) undef = 1;
-				for (stol; stol < len_str[str]; stol++)
-				{
-					if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
-					if (undef == 0 && !(strcmp(a[str][stol], nam_fun))) a[str][stol][0] = '.';
-					else if (undef == 1 && !(strcmp(a[str][stol], nam_fun))) undef = 2;
-					break;
-				}
-			}
-			if (undef == 2) break;
-
-			if (!(strcmp(a[str][stol], nam_fun)) && undef == 0)
-			{
-				int i = 0;
-				stol++;
-				for (int asd = stol; asd < len_str[str]; asd++, i++) // запись символов после замены
-				{
-					sav_ost[i] = (char*)calloc(M, sizeof(char));
-					strcpy(sav_ost[i], a[str][asd]);
-					sav_ost[i] = (char*)realloc(sav_ost[i], strlen(a[str][asd]) + 1);
-				}
-
-				stol = str_stol ;
-
-				a[str] = (char**)realloc(a[str], (N) * sizeof(char*));
-
-				for (int st = 0; st < pos_fun -1 ; st++, stol++) { // замена макроопределения
-					a[str][stol] = (char*)calloc(N, sizeof(char));
-					strcpy(a[str][stol], per_fun[st]);
-					a[str][stol] = (char*)realloc(a[str][stol], strlen(per_fun[st]) + 1);
-				}
-
-				for (int k = 0; k < i; k++, stol++) { // добавление символов остатка
-					a[str][stol] = (char*)calloc(M, sizeof(char));
-					strcpy(a[str][stol], sav_ost[k]);
-					a[str][stol] = (char*)realloc(a[str][stol], strlen(sav_ost[k]) + 1);
-					free(sav_ost[k]); 
-				}
-
-				a[str] = (char**)realloc(a[str], (stol) * sizeof(char*));
-
-				len_str[str] = stol;
-
-				stol = str_stol;
-				sav_ost = (char**)calloc(M, sizeof(char*)); 
-				
-			}
-		}
-		if (undef == 2) break;
-	}
-	free(sav_ost);
-	
-}
 
 int if_(int str, int stol)
 {
@@ -549,16 +483,21 @@ int if_(int str, int stol)
 
 	for (int stol = 0; stol < len_str[str]; stol++)
 	{
+		//printf("%s ", a[str][stol]);
 		COM
 		if (a[str][stol][0] >= '0' && a[str][stol][0] <= '9')
 		{
-			if (f > 2) {flag = -1; break;}
+			//printf("%s ", a[str][stol]);
+			if (f > 2 && z > 2) {flag = -1; break;}
+			//while(a[str][stol])
 			arr_for[f++] = atoi(a[str][stol]);
+			//printf("%s ", a[str][stol]);
 		}
 		else if (a[str][stol][0] == '-' || a[str][stol][0] == '+' || a[str][stol][0] == '*' || a[str][stol][0] == '/' || a[str][stol][0] == '%' || a[str][stol][0] == '^') znk[z++] = a[str][stol][0];
 
 		else if (a[str][stol][0] == '=' || a[str][stol][0] == '>' || a[str][stol][0] == '<' || a[str][stol][0] == '!')
 		{
+			if (z == 0) z++;
 			if (flag == 0)
 			switch (znk[--z]) {
 			case '*': arr_for[0] *= arr_for[--f]; break;
@@ -567,6 +506,7 @@ int if_(int str, int stol)
 			case '+': arr_for[0] += arr_for[--f]; break;
 			case '-': arr_for[0] -= arr_for[--f]; break;
 			case '^': arr_for[0] -= arr_for[--f]; break;
+			default:  break;
 			}
 			f = 1;
 			flag += a[str][stol][0];
@@ -574,6 +514,7 @@ int if_(int str, int stol)
 
 		else if (stol + 1 == len_str[str])
 		{
+			if (z == 0) z++;
 			while (f > 2)
 			{
 				switch (znk[--z]) {
@@ -583,6 +524,7 @@ int if_(int str, int stol)
 				case '+': arr_for[1] += arr_for[--f]; break;
 				case '-': arr_for[1] -= arr_for[--f]; break;
 				case '^': arr_for[1] -= arr_for[--f]; break;
+				default:  break;
 				}
 			}
 
@@ -593,6 +535,7 @@ int if_(int str, int stol)
 			case 94: if (arr_for[0] != arr_for[1]) flag = 0; break; // !=
 			case 123: if (arr_for[0] >= arr_for[1])flag = 0; break;// >=
 			case 121: if (arr_for[0] <= arr_for[1]) flag = 0; break; // <=
+			default:  break;
 			}
 		}
 	}
@@ -612,7 +555,7 @@ int ifdef(int str, int stol, int one) {
 	for (stol = 0; stol < len_str[str]; stol++)
 	{
 		COM
-		if (a[str][stol][0] == '\t' || a[str][stol][0] == ' ' || a[str][stol][0] == ',') continue;
+		if PROPUSK continue;
 		if (a[str][stol][0] == '.')
 		{
 			flag = 0;
